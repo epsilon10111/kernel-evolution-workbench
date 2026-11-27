@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Kernel Evolution Workbench</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f5f4f0;
+        --card: #fffefa;
+        --ink: #203730;
+        --muted: #526660;
+        --line: #d2d9d2;
+        --green: #166448;
+        --orange: #895315;
+        --mono: "IBM Plex Mono", Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          15px/1.55 "Instrument Sans",
+          "Noto Sans CJK SC",
+          sans-serif;
+        font-variant-numeric: tabular-nums;
+      }
+      main {
+        width: min(100% - 40px, 1390px);
+        margin: auto;
+        padding: 0 0 48px;
+      }
+      header,
+      nav,
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      header {
+        padding: 22px 0 16px;
+        border-bottom: 2px solid var(--ink);
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(23px, 3vw, 31px);
+        line-height: 1.2;
+      }
+      h2 {
+        font-size: 19px;
+        margin: 0 0 12px;
+      }
+      h3 {
+        font-size: 16px;
+      }
+      nav {
+        gap: 18px;
+        font-size: 14px;
+      }
+      a {
+        color: var(--green);
+        text-underline-offset: 3px;
+      }
+      a:focus-visible,
+      summary:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 3px;
+      }
+      section {
+        margin-top: 24px;
+      }
+      .row > h2 {
+        margin: 0;
+      }
+      .sub,
+      .label,
+      dt,
+      time,
+      small {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      select {
+        font: inherit;
+        color: inherit;
+        background: var(--card);
+        border: 1px solid var(--line);
+        padding: 4px 8px;
+        max-width: 100%;
+      }
+      .notice {
+        margin: 14px 0;
+        padding: 12px 16px;
+        background: #e5eee6;
+        border-left: 3px solid var(--green);
+      }
+      .notice.error {
+        background: #fff0d9;
+        border-color: var(--orange);
+      }
+      .metrics,
+      .seats {
+        display: grid;
+        gap: 12px;
+      }
+      .metrics {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin: 12px 0;
+      }
+      .seats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .box,
+      .metric,
+      details.report {
+        background: var(--card);
+        border: 1px solid var(--line);
+        min-width: 0;
+      }
+      .box,
+      .metric {
+        padding: 14px 16px;
+      }
+      .value {
+        display: block;
+        font: 600 26px/1.4 var(--mono);
+        letter-spacing: -0.04em;
+        color: var(--green);
+        overflow-wrap: anywhere;
+      }
+      .metric small {
+        display: block;
+      }
+      .state {
+        font-weight: 650;
+        color: var(--green);
+      }
+      .state.warn {
+        color: var(--orange);
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 4px 12px;
+        align-items: baseline;
+        margin: 12px 0 0;
+      }
+      .fields dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .sha {
+        font: 13px/1.5 var(--mono);
+        overflow-wrap: anywhere;
+      }
+      summary {
+        cursor: pointer;
+        color: var(--ink);
+        padding: 8px 0;
+      }
+      .report {
+        margin: 8px 0;
+      }
+      .report > summary {
+        padding: 10px 14px;
+        font-weight: 620;
+      }
+      .report-body {
+        padding: 0 14px 14px;
+      }
+      .scroll {
+        overflow: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0;
+      }
+      td,
+      th {
+        padding: 6px 9px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+        text-align: left;
+      }
+      th {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      details details {
+        margin: 0.4em 0;
+      }
+      code {
+        font-family: var(--mono);
+        overflow-wrap: anywhere;
+      }
+      .live {
+        display: inline-flex;
+        gap: 7px;
+        align-items: center;
+      }
+      .live:before {
+        content: "";
+        height: 7px;
+        width: 7px;
+        border-radius: 50%;
+        background: var(--green);
+      }
+      [data-error="true"]:before {
+        background: var(--orange);
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .empty {
+        margin: 8px 0;
+        padding: 12px 14px;
+        border-left: 2px solid var(--line);
+        color: var(--muted);
+      }
+      #trend-panel { padding: clamp(14px, 2vw, 24px); }
+      .trend-controls, .trend-legend, .shape-values { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; }
+      .trend-controls, .trend-legend { font-size: 13px; }
+      .trend-controls select { font-size: 13px; }
+      .trend-legend { margin: 8px 0 14px; color: var(--muted); }
+      .trend-legend span { display: inline-flex; align-items: center; gap: 5px; }
+      .trend-legend i { width: 19px; border-top: 3px solid var(--series); }
+      .trend-legend .step { border-top-style: dashed; }
+      #trend-panel h3 { font-size: 17px; }
+      .trend-overview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(235px, 29%); align-items: stretch; gap: 22px; }
+      .trend-aside { background: #f3f5ef; padding: 14px; border-radius: 4px; min-width: 0; }
+      .trend-aside h3 { margin-bottom: 6px; }
+      #trend-inspect table { margin: 0; }
+      #trend-inspect td, #trend-inspect th { padding: 6px 4px; white-space: nowrap; font-size: 12px; }
+      #trend-inspect td:nth-child(n+2), #trend-inspect th:nth-child(n+2) { text-align: right; }
+      #trend-plot, .shape-plot { display: block; width: 100%; cursor: crosshair; }
+      #trend-plot { height: 228px; }
+      #trend-panel canvas:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+      .shape-group { margin-top: 10px; }
+      .shape-group h4 { margin: 0 0 5px; font-size: 14px; }
+      #trend-shape-heading { border-top: 1px solid var(--line); padding-top: 15px; margin-top: 15px; }
+      .shape-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+      .shape-trend { min-width: 0; background: #f8f9f5; border: 1px solid var(--line); padding: 6px 8px; border-radius: 3px; }
+      .shape-trend h5 { margin: 0; font: 600 12px/1.6 var(--mono); }
+      .shape-plot { height: 90px; }
+      .shape-values { gap: 3px 9px; font: 11px/1.5 var(--mono); }
+      .trend-plus { color: #8d421c; }
+      .trend-minus { color: #166448; }
+      .rank-action { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+      button { font: inherit; cursor: pointer; }
+      button:focus-visible, #rank-source:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+      .rank-button { border: 1px solid var(--green); border-radius: 4px; background: var(--green); color: white; padding: 6px 14px; }
+      .rank-button:disabled { background: var(--line); border-color: var(--line); color: var(--muted); cursor: default; }
+      #rank-dialog { width: min(780px, calc(100% - 28px)); max-height: 88vh; box-sizing: border-box; overflow: auto;
+        background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: clamp(14px, 3vw, 24px); }
+      #rank-dialog::backdrop { background: rgb(22 32 27 / 45%); }
+      #rank-dialog h2 { margin: 0; }
+      #rank-close { background: transparent; border: 1px solid var(--line); color: inherit; border-radius: 4px; padding: 4px 10px; }
+      #rank-options { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(180px,100%),1fr)); gap: 8px; margin: 12px 0; }
+      #rank-options label { display: grid; grid-template-columns: auto 1fr; gap: 0 6px; align-items: baseline;
+        border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; cursor: pointer; }
+      #rank-options label:has(:checked) { border-color: var(--green); background: #edf3ec; }
+      #rank-options input { grid-row: span 2; accent-color: var(--green); }
+      #rank-options small { grid-column: 2; }
+      #rank-source { display: block; width: 100%; height: clamp(140px,36vh,380px); box-sizing: border-box; resize: vertical;
+        font: 13px/1.55 var(--mono); tab-size: 4; background: #f8f9f5; color: var(--ink); border: 1px solid var(--line); padding: 10px; margin: 6px 0 12px; }
+      @media (max-width: 840px) {
+        .trend-overview { grid-template-columns: 1fr; gap: 6px; }
+        .shape-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+        .trend-aside { padding: 9px 12px; }
+      }
+      @media (max-width: 480px) {
+        #trend-plot { height: 192px; }
+        .shape-grid { grid-template-columns: 1fr; }
+        .shape-plot { height: 90px; }
+      }
+      @media (max-width: 830px) {
+        .metrics {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .seats {
+          grid-template-columns: 1fr;
+        }
+        .fields {
+          grid-template-columns: 7em 1fr;
+        }
+      }
+      @media (max-width: 500px) {
+        main {
+          width: calc(100% - 24px);
+        }
+        header {
+          gap: 8px;
+        }
+        nav {
+          font-size: 13px;
+        }
+        .metric {
+          padding: 10px;
+        }
+        .value {
+          font-size: 22px;
+        }
+        .row {
+          align-items: flex-start;
+        }
+        .box {
+          padding: 12px;
+        }
+        th,
+        td {
+          padding: 5px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Kernel Evolution Workbench</h1>
+        <nav><span class="live" id="connection">读取中</span></nav>
+      </header>
+      <section aria-label="题目和设备">
+        <div class="row">
+          <label>题目　<select id="problem"></select></label><span id="device" class="muted"></span>
+        </div>
+        <div id="notice" class="notice" role="status"></div>
+        <div class="metrics" id="metrics"></div>
+        <div class="rank-action">
+          <button type="button" class="rank-button" id="rank-open" aria-haspopup="dialog" aria-describedby="rank-hint" disabled>查看 TOP 3 源码</button>
+          <span class="sub" id="rank-hint">全部轮次评测和复盘完成后开放</span>
+        </div>
+      </section>
+      <dialog id="rank-dialog" aria-labelledby="rank-heading">
+        <div class="row"><h2 id="rank-heading">整题延迟 TOP 3</h2><button type="button" id="rank-close">关闭</button></div>
+        <p class="sub">按同一份源码的完整候选测量中位数升序排列。</p>
+        <div id="rank-options" role="radiogroup" aria-label="选择排名源码"></div>
+        <label for="rank-source" class="sub">完整 CUDA 源码</label>
+        <textarea id="rank-source" readonly spellcheck="false" wrap="off"></textarea>
+        <div class="rank-action">
+          <button type="button" class="rank-button" id="rank-copy" disabled>复制完整源码</button>
+          <span class="sub" id="rank-status" role="status" aria-live="polite"></span>
+        </div>
+      </dialog>
+      <section>
+        <div id="trend-panel" class="box">
+          <div class="row">
+            <h2 id="trend-heading">延迟趋势</h2>
+            <div class="trend-controls">
+              <label>查看轮次　<select id="trend-round"></select></label>
+              <label><input type="checkbox" id="trend-baseline" /> 图中显示基线</label>
+            </div>
+          </div>
+          <div class="trend-legend">
+            <span><i style="--series:#146a4a"></i>Agent a</span>
+            <span><i style="--series:#2468b0"></i>Agent b</span>
+            <span><i style="--series:#a84f19"></i>Agent c</span>
+            <span><i class="step" style="--series:#555060"></i>截至该轮的整题最佳版本</span>
+          </div>
+          <div class="trend-overview">
+            <div>
+              <h3>整题总延迟</h3>
+              <p class="sub" id="trend-summary"></p>
+              <canvas id="trend-plot" role="img" tabindex="0" aria-label="整题总延迟，各席位共享轮次横轴" aria-describedby="trend-inspect"></canvas>
+            </div>
+            <aside class="trend-aside"><h3 id="trend-current">本轮对照</h3><div id="trend-inspect" aria-live="polite"></div></aside>
+          </div>
+          <div class="row" id="trend-shape-heading"><h3>逐形状延迟</h3><span class="sub" id="trend-shape-note"></span></div>
+          <div id="trend-shapes"></div>
+        </div>
+      </section>
+      <section>
+        <h2>三个开发席位</h2>
+        <div class="seats" id="seats"></div>
+      </section>
+      <section>
+        <div class="row">
+          <h2>完整候选与逐例结果</h2>
+          <span class="sub">表内数值来自单份完整报告，单位 µs</span>
+        </div>
+        <div id="comparison" class="scroll"></div>
+        <div id="results"></div>
+      </section>
+      <section>
+        <h2>逐形状保留的版本</h2>
+        <div id="routes"></div>
+      </section>
+    </main>
+    <script>
+      "use strict";
+      const by = (id) => document.getElementById(id),
+        textState = {
+          idle: "待调度",
+          developing: "开发中",
+          queued: "等待 H20",
+          evaluating: "评测中",
+          reviewing: "复盘中",
+          waiting_evidence: "等待新证据",
+          lost: "进程失联",
+        };
+      const num = (n) =>
+        Number.isFinite(n) ? new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 6 }).format(n) : "—";
+      const stamp = (s) => {
+        if (!s) return "—";
+        const d = new Date(typeof s === "number" ? s * 1000 : s);
+        return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("zh-CN", { hour12: false });
+      };
+      const titles = {
+        hinge: "A · Hinge Loss",
+        histogram: "B · Image Histogram",
+        leaky_relu: "C · Leaky ReLU",
+        C_leaky_relu: "C · Leaky ReLU",
+      };
+      let snapshot,
+        selected = 0,
+        activeKey = "",
+        busy = false,
+        lastUpdate = 0;
+      function add(parent, tag, text, cls) {
+        const e = document.createElement(tag);
+        if (text != null) e.textContent = text;
+        if (cls) e.className = cls;
+        parent.append(e);
+        return e;
+      }
+      function clear(id) {
+        const e = by(id);
+        e.replaceChildren();
+        return e;
+      }
+      function metric(parent, name, value, note) {
+        const e = add(parent, "div", null, "metric");
+        add(e, "span", name, "label");
+        add(e, "strong", value, "value");
+        if (note) add(e, "small", note);
+      }
+      function field(dl, name, value) {
+        add(dl, "dt", name);
+        return add(dl, "dd", value || "—");
+      }
+      function artifact(kind, key, index = selected) {
+        return "/api/campaign/" + index + "/" + kind + "/" + encodeURIComponent(key);
+      }
+      let rankingKey = "", sourceRequest = 0, sourceText = "";
+      function ranking(c) {
+        const rows = c.top3, key = JSON.stringify([selected, rows]);
+        if (rankingKey === key) return;
+        rankingKey = key;
+        if (by("rank-dialog").open) by("rank-dialog").close();
+        by("rank-open").disabled = !rows?.length;
+        by("rank-hint").textContent = rows == null ? "全部轮次评测和复盘完成后开放" :
+          rows.length ? "已完成 · 按完整候选测量的整题中位数排名" : "评测已结束，暂无通过全套校验的候选源码";
+      }
+      async function selectSource(row) {
+        const request = ++sourceRequest, field = by("rank-source"), status = by("rank-status");
+        sourceText = field.value = "";
+        by("rank-copy").disabled = true;
+        status.textContent = "正在读取源码…";
+        try {
+          const res = await fetch(artifact("source", row.source_sha256), {cache:"no-store", signal:AbortSignal.timeout(10000)});
+          if (!res.ok) throw Error();
+          const code = await res.text();
+          if (request !== sourceRequest) return;
+          sourceText = field.value = code;
+          by("rank-copy").disabled = false;
+          status.textContent = "SHA-256　" + row.source_sha256.slice(0, 16);
+        } catch {
+          if (request === sourceRequest) status.textContent = "源码读取失败，请重新打开或选择另一项。";
+        }
+      }
+      by("rank-open").onclick = () => {
+        const rows = snapshot.campaigns[selected].top3, options = clear("rank-options");
+        if (!rows?.length) return;
+        rows.forEach((row, i) => {
+          const label = add(options, "label"), radio = add(label, "input");
+          radio.type = "radio"; radio.name = "rank-choice"; radio.checked = i === 0;
+          add(label, "strong", (i + 1) + ".　" + fmt(row.total_us) + " µs");
+          add(label, "small", "Agent " + row.agent + " · " + roundName(row.round) + " · " + row.samples + " 次测量");
+          radio.onchange = () => selectSource(row);
+        });
+        by("rank-dialog").showModal();
+        options.querySelector("input").focus();
+        selectSource(rows[0]);
+      };
+      by("rank-close").onclick = () => by("rank-dialog").close();
+      by("rank-dialog").addEventListener("close", () => { ++sourceRequest; sourceText = ""; });
+      by("rank-copy").onclick = async () => {
+        const request = sourceRequest;
+        try {
+          await navigator.clipboard.writeText(sourceText);
+          if (request === sourceRequest) by("rank-status").textContent = "已复制完整源码";
+        } catch {
+          if (request !== sourceRequest) return;
+          const field = by("rank-source");
+          field.focus(); field.select();
+          by("rank-status").textContent = document.execCommand("copy") ? "已复制完整源码" : "已选中完整源码，按 Ctrl+C 或 ⌘C 复制。";
+        }
+      };
+      function sha(parent, value, linked) {
+        if (!value) {
+          parent.textContent = "—";
+          return;
+        }
+        parent.replaceChildren();
+        const e = add(parent, linked ? "a" : "code", value.slice(0, 16), "sha");
+        e.title = value;
+        if (linked) e.href = artifact("source", value);
+      }
+      function empty(id, msg) {
+        add(clear(id), "p", msg, "empty");
+      }
+      const seatColors = {a:"#146a4a", b:"#2468b0", c:"#a84f19"};
+      const roundName = (n) => "第" + (n > 0 && n <= 10 ? "零一二三四五六七八九十"[n] : String(n)) + "轮";
+      const measured = (p, key) => key === "total_us" ? p?.total_us : p?.shape_means_us?.[key];
+      const fmt = (v) => Number.isFinite(v) ? v.toFixed(3) : "—";
+      const trendGeometry = new WeakMap();
+      let trendRows = [], trendBase = null, trendRounds = [], trendCards = [], roundBySeat = new Map();
+      let currentRound = 0, followRound = true, trendKey = "", lastTrendWidth = 0, shapeKey = "";
+
+      function limits(values) {
+        const nums = values.filter(Number.isFinite);
+        if (!nums.length) return [0, 1];
+        const low = Math.min(...nums), high = Math.max(...nums);
+        const margin = Math.max((high - low) * 0.09, high * 0.001, 0.02);
+        const step = Math.pow(10, Math.floor(Math.log10((high - low + 2 * margin) / 4)));
+        return [Math.max(0, Math.floor((low - margin) / step) * step), Math.ceil((high + margin) / step) * step];
+      }
+
+      function drawRounds(canvas, key, domain) {
+        const mini = key !== "total_us", width = canvas.clientWidth, height = canvas.clientHeight;
+        if (!width || !height) return;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
+        const ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+        const left = mini ? 30 : 51, right = width - (mini ? 20 : 30);
+        const top = mini ? 8 : 18, bottom = height - (mini ? 21 : 28);
+        const [lo, hi] = domain;
+        const x = (r) => trendRounds.length === 1 ? (left + right) / 2 :
+          left + (r - 1) * (right - left) / Math.max(1, trendRounds.length - 1);
+        const y = (v) => bottom - (v - lo) / (hi - lo) * (bottom - top);
+        trendGeometry.set(canvas, {left, right});
+        function line(x1, y1, x2, y2) {
+          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        }
+        ctx.font = (mini ? "10px" : "12px") + " system-ui,sans-serif";
+        ctx.textAlign = "right"; ctx.fillStyle = "#5d6c65"; ctx.strokeStyle = "#d8dfd7";
+        const divisions = mini ? 2 : 4;
+        for (let i = 0; i <= divisions; i++) {
+          const v = lo + i * (hi - lo) / divisions;
+          line(left, y(v), right, y(v));
+          ctx.fillText(v.toFixed(hi - lo < 2 ? 2 : hi - lo < 20 ? 1 : 0), left - 5, y(v) + 3);
+        }
+        const spacing = Math.max(1, Math.ceil(trendRounds.length / Math.max(2, (right - left) / (mini ? 45 : 66))));
+        ctx.textAlign = "center";
+        for (const r of trendRounds) {
+          if ((r - 1) % spacing === 0 || r === trendRounds.length) ctx.fillText(roundName(r), x(r), bottom + (mini ? 15 : 19));
+        }
+        if (!trendRounds.length) return;
+        const highlight = x(currentRound);
+        ctx.fillStyle = "rgba(47,74,61,0.055)";
+        ctx.fillRect(highlight - 8, top, 16, bottom - top);
+        ctx.strokeStyle = "#aebbb0"; ctx.lineWidth = 1; ctx.setLineDash([2,4]);
+        line(highlight, top, highlight, bottom);
+        ctx.save(); ctx.beginPath(); ctx.rect(left - 7, top - 6, right - left + 14, bottom - top + 12); ctx.clip();
+
+        if (by("trend-baseline").checked && trendBase) {
+          ctx.setLineDash([2,4]); ctx.strokeStyle = "#796e5c";
+          line(left, y(measured(trendBase,key)), right, y(measured(trendBase,key)));
+        }
+        if (!mini) {
+          let previous = null;
+          ctx.setLineDash([6,4]); ctx.lineWidth = 2; ctx.strokeStyle = "#555060";
+          for (const r of trendRounds) {
+            const included = trendRows.filter((p) => p.decision === "promoted" && p.round <= r);
+            const best = included.at(-1) || (by("trend-baseline").checked ? trendBase : null);
+            if (previous && best) {
+              line(x(r-1), y(previous.total_us), x(r), y(previous.total_us));
+              if (previous.id !== best.id) line(x(r), y(previous.total_us), x(r), y(best.total_us));
+            }
+            previous = best;
+          }
+        }
+        ctx.setLineDash([]);
+        for (const [seat,color] of Object.entries(seatColors)) {
+          let previous = null;
+          for (const r of trendRounds) {
+            const point = roundBySeat.get(seat + r), v = measured(point,key);
+            if (!Number.isFinite(v)) { previous = null; continue; }
+            ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = mini ? 1.65 : 2.6;
+            if (previous) line(x(previous.round), y(measured(previous,key)), x(r), y(v));
+            if (!mini && point.total_range_us) {
+              const [a,b] = point.total_range_us;
+              ctx.globalAlpha = 0.6; ctx.lineWidth = 1;
+              line(x(r),y(a),x(r),y(b)); line(x(r)-3,y(a),x(r)+3,y(a)); line(x(r)-3,y(b),x(r)+3,y(b));
+              ctx.globalAlpha = 1;
+            }
+            const cx = x(r), cy = y(v), radius = mini ? 2.5 : 4;
+            ctx.beginPath();
+            if (seat === "a") ctx.arc(cx,cy,radius,0,Math.PI*2);
+            else if (seat === "b") ctx.rect(cx-radius,cy-radius,2*radius,2*radius);
+            else { ctx.moveTo(cx,cy-radius-1); ctx.lineTo(cx+radius+1,cy+radius); ctx.lineTo(cx-radius-1,cy+radius); ctx.closePath(); }
+            ctx.fill(); previous = point;
+          }
+        }
+        ctx.restore();
+      }
+
+      function roundControls(canvas) {
+        const selectX = (e) => {
+          const g = trendGeometry.get(canvas);
+          if (!g || !trendRounds.length) return;
+          const n = 1 + Math.round((e.offsetX - g.left) / (g.right - g.left) * (trendRounds.length - 1));
+          selectRound(n);
+        };
+        canvas.addEventListener("click", selectX);
+        canvas.addEventListener("keydown", (e) => {
+          if (!["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) return;
+          e.preventDefault();
+          selectRound(e.key === "Home" ? 1 : e.key === "End" ? trendRounds.length :
+            currentRound + (e.key === "ArrowLeft" ? -1 : 1));
+        });
+      }
+      function selectRound(n) {
+        if (!trendRounds.length) return;
+        followRound = false;
+        currentRound = Math.max(1, Math.min(trendRounds.length, n));
+        by("trend-round").value = String(currentRound);
+        paintTrend();
+      }
+      function paintTrend() {
+        const showBase = by("trend-baseline").checked, tableBox = clear("trend-inspect");
+        const visible = showBase && trendBase ? [trendBase, ...trendRows] : trendRows;
+        by("trend-summary").textContent = (trendBase ? "基线 " + fmt(trendBase.total_us) + " µs。 " : "") +
+          "各形状均值之和。点为复测中位数，短竖线标出最低和最高耗时。";
+        drawRounds(by("trend-plot"), "total_us", limits(visible.flatMap((p) => p.total_range_us || [p.total_us])));
+        by("trend-current").textContent = currentRound ? roundName(currentRound) + "对照" : "本轮对照";
+        by("trend-shape-note").textContent = "同一尺寸共用纵轴 · 单位 µs" +
+          (currentRound ? " · 图下为" + roundName(currentRound) + "数值" : "");
+        if (currentRound) {
+          const table = add(tableBox,"table"), head = add(table,"tr");
+          for (const h of ["席位","总延迟 µs",currentRound===1 ? "比基线 µs" : "比上轮 µs"]) add(head,"th",h);
+          for (const [seat,color] of Object.entries(seatColors)) {
+            const p = roundBySeat.get(seat + currentRound), row = add(table,"tr");
+            const th = add(row,"th", "Agent " + seat); th.style.color = color;
+            const valueCell = add(row,"td");
+            if (p) {
+              const link = add(valueCell,"a",fmt(p.total_us)); link.href = artifact("report",p.report_id);
+              link.title = p.samples + " 次完整测量，查看代表报告";
+            } else valueCell.textContent = "待测";
+            const parent = currentRound === 1 ? trendBase : roundBySeat.get(seat + (currentRound - 1));
+            const delta = p && parent ? p.total_us - parent.total_us : null;
+            const deltaCell = add(row,"td",delta == null ? "—" : (delta > 0 ? "+" : "") + fmt(delta));
+            if (delta != null) deltaCell.className = delta > 0 ? "trend-plus" : "trend-minus";
+          }
+          add(tableBox,"p","负值表示比对照更快。点击耗时可打开原始报告。","sub");
+        } else add(tableBox,"p","等待第一轮完整测量。","sub");
+        for (const group of trendCards) {
+          const domain = limits(visible.flatMap((p) => group.map((c) => measured(p,c.id))));
+          for (const card of group) {
+            drawRounds(card.canvas,card.id,domain);
+            card.values.replaceChildren();
+            for (const [seat,color] of Object.entries(seatColors)) {
+              const v = measured(roundBySeat.get(seat + currentRound), card.id);
+              const span = add(card.values,"span",seat + " " + (Number.isFinite(v) ? v.toFixed(2) : "—"));
+              span.style.color = color;
+            }
+          }
+        }
+      }
+      function trend(c) {
+        const key = JSON.stringify([selected, c.shape_ids]), rows = c.trend || [];
+        const last = Math.max(0,...(c.rounds || []).map((r) => r.round),...rows.map((r) => r.round));
+        const revision = JSON.stringify([key,last,rows]);
+        if (revision === trendKey) return;
+        trendKey = revision;
+        if (shapeKey !== key) {
+          followRound = true; shapeKey = key;
+          const area = clear("trend-shapes"), groups = new Map();
+          for (const id of c.shape_ids || []) {
+            const match = /^n(\d+)_m(\d+)_a([\d.]+)$/.exec(id);
+            const name = match ? match[1] + " × " + match[2] : "评测形状";
+            if (!groups.has(name)) {
+              const section = add(area,"div",null,"shape-group");
+              add(section,"h4",name);
+              groups.set(name,{grid:add(section,"div",null,"shape-grid"),cards:[]});
+            }
+            const g = groups.get(name), card = add(g.grid,"div",null,"shape-trend");
+            add(card,"h5",match ? "α = " + match[3] : id);
+            const canvas = add(card,"canvas",null,"shape-plot");
+            canvas.tabIndex=0; canvas.setAttribute("role","img");
+            canvas.setAttribute("aria-label",name + " " + (match ? "α=" + match[3] : id) + " 的轮次延迟");
+            roundControls(canvas);
+            g.cards.push({id,canvas,values:add(card,"div",null,"shape-values")});
+          }
+          trendCards = [...groups.values()].map((g) => g.cards);
+        }
+        trendRows = rows.filter((p) => p.agent);
+        trendBase = rows.find((p) => !p.agent) || null;
+        roundBySeat = new Map(trendRows.map((p) => [p.agent + p.round,p]));
+        trendRounds = Array.from({length:last},(_,i) => i+1);
+        currentRound = followRound ? last : Math.min(last,currentRound);
+        const select = by("trend-round");
+        if (select.options.length !== last) {
+          select.replaceChildren(...trendRounds.map((r) => new Option(roundName(r),String(r))));
+        }
+        select.disabled = !last; select.value = String(currentRound);
+        paintTrend();
+      }
+      by("trend-round").onchange = (e) => selectRound(Number(e.target.value));
+      by("trend-baseline").onchange = paintTrend;
+      roundControls(by("trend-plot"));
+      new ResizeObserver(([entry]) => {
+        if (entry.contentRect.width !== lastTrendWidth) {
+          lastTrendWidth = entry.contentRect.width; paintTrend();
+        }
+      }).observe(by("trend-panel"));
+      function seats(c) {
+        const root = clear("seats");
+        for (const s of c.agents) {
+          const card = add(root, "article", null, "box"),
+            h = add(card, "div", null, "row");
+          add(h, "h3", "Agent " + s.agent);
+          const lost = s.alive === false;
+          const round = [...c.rounds].reverse().find((r) => r.agent === s.agent && r.conclusion);
+          const finished = s.state === "idle" && round?.review && round.id === s.round_id;
+          add(
+            h,
+            "span",
+            lost ? "进程失联" : finished ? "本轮已完成" : textState[s.state] || s.state,
+            lost || s.state === "queued" ? "state warn" : "state",
+          );
+          const dl = add(card, "dl", null, "fields");
+          field(dl, "轮次", s.round != null ? String(s.round) : "—");
+          sha(
+            field(dl, "父版 SHA"),
+            s.parent_sha,
+            c.reports.some((r) => r.source_sha256 === s.parent_sha && r.source),
+          );
+          sha(field(dl, "候选 SHA"), s.candidate_sha, !!s.source);
+          field(dl, "假设", s.hypothesis);
+          field(dl, "状态说明", s.detail);
+          field(dl, "最近活动", stamp(s.last_activity));
+          if (s.pid) field(dl, "工作进程", String(s.pid));
+          if (round) field(dl, "最近结论", "第 " + round.round + " 轮 · " + round.conclusion);
+        }
+      }
+      function renderReport(box, report) {
+        const shapes = report.shapes || [];
+        if (report.error) add(box, "p", String(report.error), "notice error");
+        const warm = report.prewarm;
+        if (warm && warm.completed) {
+          const cases = warm.cases.map((c) => c.shape_id + "/" + c.case_id).join("、");
+          add(box, "p", "独立预热 " + num(warm.elapsed_s) + " 秒，" + warm.cycles +
+            " 轮，" + (warm.synchronized ? "已同步" : "未同步") +
+            (warm.excluded_from_score ? "，耗时不计分" : "") + "。用例 " + cases, "sub");
+        }
+        const env = report.environment || {};
+        add(
+          box,
+          "p",
+          [report.dataset_version, report.protocol_version, env.gpu_uuid, env.driver_version]
+            .filter(Boolean)
+            .join(" · "),
+          "sub",
+        );
+        for (const s of shapes) {
+          const d = add(box, "details"),
+            cases = s.cases || [];
+          add(d, "summary", s.shape_id + "　均值 " + num(s.mean_us) + " µs　" + cases.length + "/10 例");
+          add(d, "p", JSON.stringify(s.parameters || {}), "sub");
+          const sc = add(d, "div", null, "scroll"),
+            table = add(sc, "table"),
+            head = add(table, "tr");
+          for (const v of ["输入", "正确性", "GPU 中位数", "端到端中位数", "原始重复样本 µs"])
+            add(head, "th", v);
+          for (const c of cases) {
+            const tr = add(table, "tr");
+            add(tr, "td", [c.case_id, c.name].filter(Boolean).join(" · "));
+            add(tr, "td", c.correct === true ? "通过" : String(c.error || c.status || "未采集"));
+            add(tr, "td", num(c.median_us));
+            add(tr, "td", num(c.e2e_median_us));
+            const raw = add(add(tr, "td"), "details");
+            add(raw, "summary", "展开样本");
+            add(raw, "p", "GPU　" + (c.gpu_samples_us || []).map(num).join(" / "));
+            add(raw, "p", "端到端　" + (c.e2e_samples_us || []).map(num).join(" / "));
+          }
+        }
+      }
+      function compare(c) {
+        const root = clear("comparison");
+        if (!c.shape_ids.length) return;
+        const columns = [
+          c.best,
+          ...c.agents.map((a) =>
+            a.candidate_sha
+              ? [...c.reports].reverse().find((r) => r.source_sha256 === a.candidate_sha && r.rankable)
+              : null,
+          ),
+        ];
+        const table = add(root, "table");
+        const head = add(table, "tr");
+        for (const col of ["指标", "整题最佳", ...c.agents.map((a) => "Agent " + a.agent)])
+          add(head, "th", col);
+        let row = add(table, "tr");
+        add(row, "th", "来源 SHA");
+        for (const col of columns) sha(add(row, "td"), col?.source_sha256, !!col?.source);
+        row = add(table, "tr");
+        add(row, "th", "整题总延迟");
+        for (const col of columns) add(row, "td", num(col?.total_us));
+        for (const id of c.shape_ids) {
+          const tr = add(table, "tr");
+          add(tr, "th", id);
+          for (const col of columns) add(tr, "td", num(col?.shape_means_us?.[id]));
+        }
+      }
+      function results(c) {
+        const idx = selected,
+          list = by("results");
+        const previous = new Map(
+          [...list.querySelectorAll("details[data-key]")].map((node) => [node.dataset.key, node]),
+        );
+        list.replaceChildren();
+        if (!c.reports.length) {
+          empty("results", "尚无本地评测报告。完整报告入库后可展开形状及十份输入。");
+        } else
+          for (const r of [...c.reports].reverse()) {
+            const key = [idx, r.id, r.report_sha256 || ""].join("/");
+            if (previous.has(key)) {
+              list.append(previous.get(key));
+              continue;
+            }
+            const details = add(list, "details", null, "report"),
+              agent = r.agent || "基线";
+            details.dataset.key = key;
+            add(
+              details,
+              "summary",
+              agent +
+                " · " +
+                (r.source_sha256 || "").slice(0, 12) +
+                "　" +
+                (r.status === "ok" ? "全套通过" : "未通过或不完整") +
+                "　" +
+                num(r.total_us) +
+                " µs",
+            );
+            const wrap = add(details, "div", null, "report-body");
+            details.addEventListener("toggle", async () => {
+              if (!details.open || wrap.dataset.loading) return;
+              wrap.dataset.loading = "true";
+              wrap.textContent = "读取逐例报告…";
+              try {
+                const url = artifact("report", r.id, idx),
+                  response = await fetch(url, { cache: "no-store" });
+                if (!response.ok) throw Error();
+                const report = await response.json();
+                wrap.replaceChildren();
+                const links = add(wrap, "div", null, "row");
+                const a = add(links, "a", "打开原始 JSON");
+                a.href = url;
+                if (r.source) {
+                  const src = add(links, "a", "查看完整源码");
+                  src.href = artifact("source", r.source_sha256, idx);
+                }
+                renderReport(wrap, report);
+              } catch {
+                wrap.textContent = "报告暂时无法读取，可收起后重新展开。";
+                delete wrap.dataset.loading;
+              }
+            });
+          }
+        const routes = clear("routes");
+        if (!c.shape_routes.length) empty("routes", "尚无已复现的单档收益。");
+        for (const x of c.shape_routes) {
+          const item = add(routes, "p");
+          add(item, "span", x.shape_id + "　");
+          sha(add(item, "span"), x.source_sha256, true);
+          add(
+            item,
+            "span",
+            "　相对 " +
+              (x.control_sha || "").slice(0, 12) +
+              "，配对收益 " +
+              (x.gains_us || []).map(num).join(" / ") +
+              " µs，波动带 " +
+              num(x.band_us) +
+              " µs",
+          );
+        }
+      }
+      function render() {
+        const c = snapshot.campaigns[selected];
+        const prep = c.preparation || {};
+        const notice = by("notice");
+        notice.textContent = [
+          prep.stage || (!c.initialized ? "架构验收中，H20 优化轮次尚未开始。" : ""),
+          prep.detail,
+          prep.updated_at ? stamp(prep.updated_at) : "",
+        ]
+          .filter(Boolean)
+          .join("　");
+        notice.hidden = !notice.textContent;
+        const dev = c.device || {};
+        by("device").textContent =
+          "H20　" +
+          ({ idle: "空闲", busy: "占用中", blocked: "排队等待" }[dev.state] || "暂无设备记录") +
+          (dev.reason ? " · " + dev.reason : "");
+        const m = clear("metrics");
+        const bestPoint = c.best && c.trend?.find((p) => p.id === (c.best.round_id || "baseline"));
+        const bestValue = bestPoint?.total_us ?? c.best?.total_us;
+        metric(m, "整题本地最佳", Number.isFinite(bestValue) ? bestValue.toFixed(3) : "—",
+          bestPoint ? "µs · 入选时 " + bestPoint.samples + " 次完整测量中位数" : "µs · 单份完整报告");
+        metric(m, "评测形状", c.shape_ids?.length ? String(c.shape_ids.length) : "—", "每形状固定十份输入");
+        metric(m, "已入库报告", num(c.reports.length));
+        metric(
+          m,
+          "排队中的任务",
+          Array.isArray(c.queue) ? num(c.queue.filter((x) => x.status === "queued").length) : "—",
+        );
+        if (c.best?.source_sha256) {
+          const dest = m.firstChild;
+          sha(add(dest, "div"), c.best.source_sha256, !!c.best.source);
+        }
+        ranking(c);
+        trend(c);
+        seats(c);
+        compare(c);
+        const key = JSON.stringify([
+          selected,
+          c.reports.map((r) => [r.id, r.status, r.report_sha256]),
+          c.shape_routes,
+        ]);
+        if (key !== activeKey) {
+          activeKey = key;
+          results(c);
+        }
+      }
+      async function poll() {
+        if (busy) return;
+        busy = true;
+        try {
+          const r = await fetch("/api/local", { cache: "no-store", signal: AbortSignal.timeout(6000) });
+          if (!r.ok) throw Error();
+          const data = await r.json();
+          if (!data.campaigns?.length) throw Error();
+          snapshot = data;
+          const sel = by("problem"),
+            names = data.campaigns.map((c) => titles[c.problem] || c.problem);
+          if (JSON.stringify(names) !== sel.dataset.names) {
+            sel.replaceChildren();
+            names.forEach((n, i) => sel.add(new Option(n, i)));
+            sel.value = String(selected);
+            sel.dataset.names = JSON.stringify(names);
+          }
+          render();
+          lastUpdate = Date.now();
+          by("connection").textContent = "更新于 " + stamp(data.now);
+          by("connection").dataset.error = "false";
+        } catch {
+          by("connection").textContent = lastUpdate
+            ? "连接中断 · 保留 " + stamp(lastUpdate / 1000) + " 快照"
+            : "无法读取状态，等待重连";
+          by("connection").dataset.error = "true";
+        } finally {
+          busy = false;
+        }
+      }
+      by("problem").addEventListener("change", (e) => {
+        selected = Number(e.target.value);
+        render();
+      });
+      poll();
+      setInterval(poll, 3000);
+    </script>
+  </body>
+</html>
